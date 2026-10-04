@@ -7,8 +7,54 @@ struct SongFinderApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .preferredColorScheme(.light)
+                .tint(Theme.accent)
         }
     }
+}
+
+// MARK: - 디자인 (아이콘과 같은 파스텔 유리 느낌)
+
+enum Theme {
+    static let accent = Color(red: 0.36, green: 0.55, blue: 0.96)
+    static let accentLight = Color(red: 0.56, green: 0.77, blue: 1.0)
+    static let lavender = Color(red: 0.70, green: 0.66, blue: 0.98)
+    static let ink = Color(red: 0.16, green: 0.20, blue: 0.36)
+    static let mint = Color(red: 0.36, green: 0.78, blue: 0.86)
+
+    static var buttonGradient: LinearGradient {
+        LinearGradient(colors: [accentLight, accent, lavender], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+}
+
+struct DreamyBackground: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [Color(red: 0.92, green: 0.95, blue: 1.0),
+                                    Color(red: 0.95, green: 0.93, blue: 1.0)],
+                           startPoint: .top, endPoint: .bottom)
+            Circle().fill(Theme.accentLight.opacity(0.35)).frame(width: 320).blur(radius: 60).offset(x: -120, y: -260)
+            Circle().fill(Theme.lavender.opacity(0.30)).frame(width: 300).blur(radius: 70).offset(x: 140, y: 120)
+            Circle().fill(Color.pink.opacity(0.12)).frame(width: 220).blur(radius: 60).offset(x: -100, y: 360)
+        }
+        .ignoresSafeArea()
+    }
+}
+
+struct Glass: ViewModifier {
+    var radius: CGFloat = 22
+    func body(content: Content) -> some View {
+        content
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .stroke(LinearGradient(colors: [.white.opacity(0.9), .white.opacity(0.3)],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1))
+            .shadow(color: Theme.accent.opacity(0.12), radius: 16, y: 8)
+    }
+}
+
+extension View {
+    func glass(_ radius: CGFloat = 22) -> some View { modifier(Glass(radius: radius)) }
 }
 
 struct ContentView: View {
@@ -51,6 +97,7 @@ struct ContentView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 40)
             }
+            .background(DreamyBackground())
             .navigationTitle("노래찾기")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -62,8 +109,8 @@ struct ContentView: View {
                         .accessibilityLabel("설정")
                 }
             }
-            .sheet(isPresented: $showSettings) { SettingsView() }
-            .sheet(isPresented: $showHistory) { HistoryView(rec: rec) }
+            .sheet(isPresented: $showSettings) { SettingsView().preferredColorScheme(.light) }
+            .sheet(isPresented: $showHistory) { HistoryView(rec: rec).preferredColorScheme(.light) }
             .onAppear {
                 SharedStore.migrateIfNeeded()
                 if !AppSettings.load().hasAnyEngine { showSettings = true }
@@ -106,21 +153,34 @@ struct ListenButton: View {
         Button(action: action) {
             ZStack {
                 Circle()
-                    .fill((busy ? Color.red : Color.indigo).opacity(0.15))
-                    .frame(width: 210, height: 210)
-                    .scaleEffect(1 + CGFloat(level) * 0.25)
+                    .fill((busy ? Color.pink : Theme.accentLight).opacity(0.25))
+                    .frame(width: 230, height: 230)
+                    .blur(radius: 6)
+                    .scaleEffect(1 + CGFloat(level) * 0.3)
                     .animation(.easeOut(duration: 0.1), value: level)
                 Circle()
-                    .fill(busy ? Color.red : Color.indigo)
+                    .fill(.ultraThinMaterial)
+                    .frame(width: 196, height: 196)
+                    .overlay(Circle().stroke(.white.opacity(0.8), lineWidth: 1.5))
+                Circle()
+                    .fill(busy ? LinearGradient(colors: [Color(red: 1, green: 0.62, blue: 0.72), Color(red: 0.95, green: 0.45, blue: 0.6)],
+                                                startPoint: .topLeading, endPoint: .bottomTrailing)
+                               : Theme.buttonGradient)
                     .frame(width: 160, height: 160)
-                    .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
+                    .overlay(
+                        Circle()
+                            .fill(LinearGradient(colors: [.white.opacity(0.55), .clear], startPoint: .top, endPoint: .center))
+                            .padding(6)
+                    )
+                    .shadow(color: (busy ? Color.pink : Theme.accent).opacity(0.35), radius: 18, y: 10)
                 VStack(spacing: 6) {
-                    Image(systemName: busy ? "stop.fill" : "waveform")
-                        .font(.system(size: 48, weight: .semibold))
+                    Image(systemName: busy ? "stop.fill" : "music.note")
+                        .font(.system(size: 50, weight: .semibold))
                     Text(busy ? "멈추기" : "듣기")
                         .font(.headline)
                 }
                 .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
             }
         }
         .buttonStyle(.plain)
@@ -140,6 +200,7 @@ struct StageView: View {
                 VStack(spacing: 6) {
                     Text("버튼을 누르고 노래를 들려주세요")
                         .font(.title3.weight(.semibold))
+                        .foregroundStyle(Theme.ink)
                     Text("40초 동안 듣고, 여러 번 확인해서 가장 맞는 곡을 골라요.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -188,7 +249,7 @@ struct TranscriptBox: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(14)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
+        .glass(16)
     }
 }
 
@@ -266,8 +327,8 @@ struct SourceChips: View {
                     .font(.caption2.weight(.medium))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(Color.indigo.opacity(0.12), in: Capsule())
-                    .foregroundStyle(.indigo)
+                    .background(Theme.accent.opacity(0.12), in: Capsule())
+                    .foregroundStyle(Theme.accent)
             }
         }
     }
@@ -310,7 +371,7 @@ struct SongCard: View {
                         Label("듣기", systemImage: "play.circle.fill")
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.indigo)
+                    .tint(Theme.accent)
                 }
                 Button(action: onSave) {
                     Label(saved ? "저장됨" : "맞아요", systemImage: saved ? "checkmark.circle.fill" : "checkmark.circle")
@@ -321,7 +382,7 @@ struct SongCard: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .glass(26)
     }
 }
 
@@ -358,10 +419,10 @@ struct Artwork: View {
             image.resizable().scaledToFill()
         } placeholder: {
             ZStack {
-                Color.indigo.opacity(0.15)
+                Theme.accent.opacity(0.15)
                 Image(systemName: "music.note")
                     .font(.system(size: size * 0.35))
-                    .foregroundStyle(.indigo)
+                    .foregroundStyle(Theme.accent)
             }
         }
         .frame(width: size, height: size)
@@ -506,11 +567,12 @@ struct PhoneAudioButton: View {
             } label: {
                 Label("이 폰 소리로 찾기", systemImage: "iphone.radiowaves.left.and.right")
                     .font(.headline)
+                    .foregroundStyle(Theme.ink)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
+                    .padding(.vertical, 16)
+                    .glass(30)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.teal)
+            .buttonStyle(.plain)
             .background(BroadcastPickerView(holder: picker).frame(width: 1, height: 1).opacity(0.01))
 
             Button("어떻게 쓰나요?") { showHelp.toggle() }
@@ -527,7 +589,7 @@ struct PhoneAudioButton: View {
                 .font(.footnote)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(12)
-                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                .glass(14)
             }
         }
     }
@@ -571,7 +633,7 @@ struct PhoneResultCard: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("방금 이 폰 소리로 찾은 곡")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.teal)
+                    .foregroundStyle(Theme.mint)
                 Text(song.title).font(.headline).lineLimit(1)
                 Text(song.artist).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
             }
@@ -584,6 +646,6 @@ struct PhoneResultCard: View {
                 .foregroundStyle(.secondary)
         }
         .padding(14)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .glass(18)
     }
 }
