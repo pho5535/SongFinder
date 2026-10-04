@@ -8,16 +8,16 @@ final class SampleHandler: RPBroadcastSampleHandler {
     private var samples: [Float] = []
     private var sampleRate: Double = 44100
     private var done = false
-    private let targetSeconds = 12.0
+    private let targetSeconds = 40.0
 
     override func broadcastStarted(withSetupInfo setupInfo: [String: NSObject]?) {
         lock.lock()
         samples = []
-        samples.reserveCapacity(48000 * 14)
+        samples.reserveCapacity(48000 * 42)
         done = false
         lock.unlock()
-        notify(title: "노래찾기", body: "이 폰에서 나오는 소리를 듣고 있어요… (약 12초)")
-        DispatchQueue.global().asyncAfter(deadline: .now() + 25) { [weak self] in
+        notify(title: "노래찾기", body: "이 폰에서 나오는 소리를 듣고 있어요… (약 40초)")
+        DispatchQueue.global().asyncAfter(deadline: .now() + 70) { [weak self] in
             self?.timeoutCheck()
         }
     }
@@ -141,7 +141,7 @@ final class SampleHandler: RPBroadcastSampleHandler {
             return
         }
 
-        let segments = [(2.0, 8.0), (0.0, 8.0), (4.0, 8.0)].compactMap {
+        let segments = [(15.0, 10.0), (2.0, 10.0), (28.0, 10.0)].compactMap {
             AudioClip.wav(all, rate: rate, from: $0.0, length: $0.1)
         }
 
