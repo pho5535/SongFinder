@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: macos-15
+    permissions:
+      contents: write
     steps:
       - name: 코드 가져오기
         uses: actions/checkout@v4
@@ -42,3 +44,11 @@ jobs:
         with:
           name: SongFinder-ipa
           path: SongFinder.ipa
+
+      - name: 다운로드 링크 만들기
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: 노래찾기 (빌드 ${{ github.run_number }})
+          files: SongFinder.ipa
+          make_latest: true
