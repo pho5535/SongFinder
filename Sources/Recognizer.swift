@@ -20,7 +20,7 @@ final class Recognizer: ObservableObject {
     @Published var warnings: [String] = []
     @Published var history: [SavedSong] = []
 
-    let seconds = 15
+    let seconds = 40
     private let capture = AudioCapture()
 
     var isBusy: Bool {
@@ -80,8 +80,8 @@ final class Recognizer: ObservableObject {
             let lyrics = transcript.count >= text.count ? transcript : text
             transcript = lyrics
 
-            // 15초를 겹치게 3구간으로 나눠요. 가운데 구간부터 먼저 보내요.
-            let segments = [(3.5, 8.0), (0.0, 8.0), (7.0, 8.0)].compactMap {
+            // 40초 중 3구간을 골라요. 가운데 구간부터 먼저 보내요.
+            let segments = [(16.0, 10.0), (3.0, 10.0), (29.0, 10.0)].compactMap {
                 capture.wavSegment(from: $0.0, length: $0.1)
             }
             guard !segments.isEmpty else {
@@ -272,7 +272,7 @@ final class Recognizer: ObservableObject {
     @Published var warnings: [String] = []
     @Published var history: [SavedSong] = []
 
-    let seconds = 15
+    let seconds = 40
     private let capture = AudioCapture()
     private let historyKey = "songHistory2"
 
@@ -330,8 +330,8 @@ final class Recognizer: ObservableObject {
             let lyrics = transcript.count >= text.count ? transcript : text
             transcript = lyrics
 
-            // 15초를 겹치게 3구간으로 나눠요. 가운데 구간부터 먼저 보내요.
-            let segments = [(3.5, 8.0), (0.0, 8.0), (7.0, 8.0)].compactMap {
+            // 40초 중 3구간을 골라요. 가운데 구간부터 먼저 보내요.
+            let segments = [(16.0, 10.0), (3.0, 10.0), (29.0, 10.0)].compactMap {
                 capture.wavSegment(from: $0.0, length: $0.1)
             }
             guard !segments.isEmpty else {
