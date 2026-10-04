@@ -1,4 +1,6 @@
+import ReplayKit
 import SwiftUI
+import UserNotifications
 
 @main
 struct SongFinderApp: App {
@@ -14,6 +16,8 @@ struct ContentView: View {
     @State private var task: Task<Void, Never>?
     @State private var showSettings = false
     @State private var showHistory = false
+    @State private var lastPhone: SavedSong?
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
@@ -21,6 +25,11 @@ struct ContentView: View {
                 VStack(spacing: 24) {
                     ListenButton(busy: rec.isBusy, level: rec.level) { toggle() }
                         .padding(.top, 16)
+                    PhoneAudioButton()
+                        .disabled(rec.isBusy)
+                    if let song = lastPhone, rec.stage != .done {
+                        PhoneResultCard(song: song) { lastPhone = nil }
+                    }
                     StageView(rec: rec)
                     if !rec.transcript.isEmpty {
                         TranscriptBox(text: rec.transcript)
@@ -56,8 +65,23 @@ struct ContentView: View {
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(isPresented: $showHistory) { HistoryView(rec: rec) }
             .onAppear {
+                SharedStore.migrateIfNeeded()
                 if !AppSettings.load().hasAnyEngine { showSettings = true }
+                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+                refreshPhoneResult()
             }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    rec.reloadHistory()
+                    refreshPhoneResult()
+                }
+            }
+        }
+    }
+
+    private func refreshPhoneResult() {
+        if let s = SharedStore.lastBroadcast(), Date().timeIntervalSince(s.date) < 600 {
+            lastPhone = s
         }
     }
 
@@ -116,7 +140,7 @@ struct StageView: View {
                 VStack(spacing: 6) {
                     Text("버튼을 누르고 노래를 들려주세요")
                         .font(.title3.weight(.semibold))
-                    Text("15초 동안 듣고, 여러 번 확인해서 가장 맞는 곡을 골라요.")
+                    Text("25초 동안 듣고, 여러 번 확인해서 가장 맞는 곡을 골라요.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -394,13 +418,13 @@ struct HistoryView: View {
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    @AppStorage(Keys.auddToken) private var auddToken = ""
-    @AppStorage(Keys.acrHost) private var acrHost = ""
-    @AppStorage(Keys.acrAccess) private var acrAccess = ""
-    @AppStorage(Keys.acrSecret) private var acrSecret = ""
-    @AppStorage(Keys.geniusToken) private var geniusToken = ""
-    @AppStorage(Keys.language) private var language = "ko-KR"
-    @AppStorage(Keys.useLyrics) private var useLyrics = true
+    @AppStorage(Keys.auddToken, store: SharedStore.defaults) private var auddToken = ""
+    @AppStorage(Keys.acrHost, store: SharedStore.defaults) private var acrHost = ""
+    @AppStorage(Keys.acrAccess, store: SharedStore.defaults) private var acrAccess = ""
+    @AppStorage(Keys.acrSecret, store: SharedStore.defaults) private var acrSecret = ""
+    @AppStorage(Keys.geniusToken, store: SharedStore.defaults) private var geniusToken = ""
+    @AppStorage(Keys.language, store: SharedStore.defaults) private var language = "ko-KR"
+    @AppStorage(Keys.useLyrics, store: SharedStore.defaults) private var useLyrics = true
 
     var body: some View {
         NavigationStack {
@@ -413,6 +437,9 @@ struct SettingsView: View {
 
                 Section {
                     KeyField(title: "API 키", text: $auddToken)
+                    Text("\"이 폰 소리로 찾기\"에는 AudD 또는 ACRCloud 키가 꼭 필요해요.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                     Link("dashboard.audd.io 에서 키 받기", destination: URL(string: "https://dashboard.audd.io/")!)
                 } header: {
                     Text("AudD · 일반 음원 인식")
@@ -463,5 +490,100 @@ struct KeyField: View {
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .font(.system(.callout, design: .monospaced))
+    }
+}
+
+// MARK: - 이 폰 소리로 찾기 (화면 방송 확장)
+
+struct PhoneAudioButton: View {
+    @StateObject private var picker = BroadcastPickerHolder()
+    @State private var showHelp = false
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Button {
+                picker.tap()
+            } label: {
+                Label("이 폰 소리로 찾기", systemImage: "iphone.radiowaves.left.and.right")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.teal)
+            .background(BroadcastPickerView(holder: picker).frame(width: 1, height: 1).opacity(0.01))
+
+            Button("어떻게 쓰나요?") { showHelp.toggle() }
+                .font(.footnote)
+            if showHelp {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("1. 유튜브·음악 앱에서 노래를 틀어 두세요.")
+                    Text("2. 이 버튼을 누르고 \"방송 시작\"을 누르세요.")
+                    Text("3. 노래 앱으로 돌아가면 20초 뒤 알림으로 제목과 가수가 떠요.")
+                    Text("4. 화면 위 빨간 표시를 누르면 언제든 멈출 수 있어요.")
+                    Text("이어폰을 끼고 있어도 돼요. 녹음을 막아 둔 앱(넷플릭스 등)의 소리는 들을 수 없어요.")
+                        .foregroundStyle(.secondary)
+                }
+                .font(.footnote)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+            }
+        }
+    }
+}
+
+final class BroadcastPickerHolder: ObservableObject {
+    weak var view: RPSystemBroadcastPickerView?
+
+    func tap() {
+        guard let view = view else { return }
+        for case let button as UIButton in view.subviews {
+            button.sendActions(for: .touchUpInside)
+            return
+        }
+    }
+}
+
+struct BroadcastPickerView: UIViewRepresentable {
+    let holder: BroadcastPickerHolder
+
+    func makeUIView(context: Context) -> RPSystemBroadcastPickerView {
+        let v = RPSystemBroadcastPickerView(frame: CGRect(x: 0, y: 0, width: 44, height: 44))
+        v.preferredExtension = SharedStore.broadcastExtensionID
+        v.showsMicrophoneButton = false
+        holder.view = v
+        return v
+    }
+
+    func updateUIView(_ uiView: RPSystemBroadcastPickerView, context: Context) {
+        holder.view = uiView
+    }
+}
+
+struct PhoneResultCard: View {
+    let song: SavedSong
+    let onClose: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Artwork(url: song.artworkURL, size: 56)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("방금 이 폰 소리로 찾은 곡")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.teal)
+                Text(song.title).font(.headline).lineLimit(1)
+                Text(song.artist).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 6)
+            if let url = listenURL(title: song.title, artist: song.artist, link: song.link) {
+                Link(destination: url) { Image(systemName: "play.circle.fill").font(.title2) }
+            }
+            Button(action: onClose) { Image(systemName: "xmark").font(.footnote) }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+        }
+        .padding(14)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 }
