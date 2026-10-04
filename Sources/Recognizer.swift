@@ -3,6 +3,11 @@ import SwiftUI
 
 @MainActor
 final class Recognizer: ObservableObject {
+    enum Mode: Equatable {
+        case song      // 노래 듣기 (40초)
+        case humming   // 허밍 (15초, ACRCloud)
+    }
+
     enum Stage: Equatable {
         case idle
         case listening(Int)
@@ -20,7 +25,8 @@ final class Recognizer: ObservableObject {
     @Published var warnings: [String] = []
     @Published var history: [SavedSong] = []
 
-    let seconds = 40
+    @Published var seconds = 40
+    @Published var mode: Mode = .song
     private let capture = AudioCapture()
 
     var isBusy: Bool {
@@ -35,9 +41,19 @@ final class Recognizer: ObservableObject {
         loadHistory()
     }
 
-    func run() async {
+    func run(mode: Mode = .song) async {
         guard !isBusy else { return }
-        let settings = AppSettings.load()
+        self.mode = mode
+        seconds = mode == .humming ? 15 : 40
+        var settings = AppSettings.load()
+        if mode == .humming {
+            guard settings.hasACR else {
+                stage = .failed("허밍으로 찾기는 ACRCloud 키가 필요해요. 설정(열쇠)에서 ACRCloud 키를 넣어 주세요.")
+                return
+            }
+            settings.auddToken = ""      // 허밍은 ACRCloud만 사용
+            settings.geniusToken = ""
+        }
         candidates = []
         confidence = nil
         notes = []
@@ -80,8 +96,11 @@ final class Recognizer: ObservableObject {
             let lyrics = transcript.count >= text.count ? transcript : text
             transcript = lyrics
 
-            // 40초 중 3구간을 골라요. 가운데 구간부터 먼저 보내요.
-            let segments = [(16.0, 10.0), (3.0, 10.0), (29.0, 10.0)].compactMap {
+            // 들은 소리 중 구간을 골라요. 가운데 구간부터 먼저 보내요.
+            let ranges: [(Double, Double)] = mode == .humming
+                ? [(2.0, 12.0)]
+                : [(16.0, 10.0), (3.0, 10.0), (29.0, 10.0)]
+            let segments = ranges.compactMap {
                 capture.wavSegment(from: $0.0, length: $0.1)
             }
             guard !segments.isEmpty else {
@@ -106,8 +125,13 @@ final class Recognizer: ObservableObject {
 
             candidates = Array(cands.prefix(5))
             confidence = Matcher.confidence(cands)
-            notes = Matcher.notes(for: cands)
-            if confidence == .sure, let top = cands.first { save(top) }
+            notes = mode == .humming && !cands.isEmpty
+                ? ["허밍으로 찾은 결과예요. 후보 중에서 맞는 곡을 골라 보세요."]
+                : Matcher.notes(for: cands)
+            if let top = cands.first {
+                Library.shared.addRecent(title: top.title, artist: top.artist, artworkURL: top.artworkURL, link: top.link)
+                history = SharedStore.loadHistory()
+            }
             stage = .done
         } catch is CancellationError {
             capture.stop()
