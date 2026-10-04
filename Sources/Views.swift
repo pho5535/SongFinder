@@ -143,7 +143,7 @@ struct ContentView: View {
                 .padding(.bottom, 40)
             }
             .background(DreamyBackground())
-            .navigationTitle("노래찾기")
+            .navigationTitle("Findy")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showSettings = true } label: { Image(systemName: "key.fill") }
