@@ -6,7 +6,7 @@ import UserNotifications
 struct SongFinderApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
                 .preferredColorScheme(.light)
                 .tint(Theme.accent)
         }
@@ -78,6 +78,21 @@ extension View {
     func glass(_ radius: CGFloat = 22) -> some View { modifier(Glass(radius: radius)) }
 }
 
+struct RootView: View {
+    var body: some View {
+        TabView {
+            ContentView()
+                .tabItem { Label("찾기", systemImage: "waveform") }
+            LyricsSearchView()
+                .tabItem { Label("가사검색", systemImage: "text.magnifyingglass") }
+            LibraryView()
+                .tabItem { Label("기록", systemImage: "clock.arrow.circlepath") }
+            TipsView()
+                .tabItem { Label("팁", systemImage: "lightbulb") }
+        }
+    }
+}
+
 struct ContentView: View {
     @StateObject private var rec = Recognizer()
     @State private var task: Task<Void, Never>?
@@ -94,6 +109,15 @@ struct ContentView: View {
                         .padding(.top, 16)
                     PhoneAudioButton()
                         .disabled(rec.isBusy)
+                    HummingButton(active: rec.isBusy && rec.mode == .humming) {
+                        if rec.isBusy {
+                            task?.cancel()
+                            rec.cancel()
+                        } else {
+                            task = Task { await rec.run(mode: .humming) }
+                        }
+                    }
+                    .disabled(rec.isBusy && rec.mode != .humming)
                     if let song = lastPhone, rec.stage != .done {
                         PhoneResultCard(song: song) { lastPhone = nil }
                     }
@@ -121,10 +145,6 @@ struct ContentView: View {
             .background(DreamyBackground())
             .navigationTitle("노래찾기")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { showHistory = true } label: { Image(systemName: "clock.arrow.circlepath") }
-                        .accessibilityLabel("찾은 곡 기록")
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showSettings = true } label: { Image(systemName: "key.fill") }
                         .accessibilityLabel("설정")
@@ -158,7 +178,7 @@ struct ContentView: View {
             task?.cancel()
             rec.cancel()
         } else {
-            task = Task { await rec.run() }
+            task = Task { await rec.run(mode: .song) }
         }
     }
 }
@@ -227,7 +247,8 @@ struct StageView: View {
                     ProgressView(value: Double(rec.seconds - left + 1), total: Double(rec.seconds))
                         .tint(.red)
                         .frame(maxWidth: 240)
-                    Text("대화나 잡음이 적은 곳에서, 노래 소리를 크게 들려주면 더 정확해요.")
+                    Text(rec.mode == .humming ? "\"음~\" 소리로 멜로디를 또렷하게 흥얼거려 주세요."
+                                              : "대화나 잡음이 적은 곳에서, 노래 소리를 크게 들려주면 더 정확해요.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -380,20 +401,21 @@ struct SongCard: View {
             }
             .multilineTextAlignment(.center)
             SourceChips(sources: candidate.sources)
-            HStack(spacing: 10) {
-                if let url = listenURL(title: candidate.title, artist: candidate.artist, link: candidate.link) {
+            HStack(spacing: 14) {
+                PreviewButton(title: candidate.title, artist: candidate.artist)
+                FavoriteButton(title: candidate.title, artist: candidate.artist,
+                               artworkURL: candidate.artworkURL, link: candidate.link)
+                if let url = listenURL(title: candidate.title, artist: candidate.artist, link: nil) {
                     Link(destination: url) {
-                        Label("듣기", systemImage: "play.circle.fill")
+                        Label("전곡 듣기", systemImage: "play.rectangle.fill")
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.accent)
                 }
-                Button(action: onSave) {
-                    Label(saved ? "저장됨" : "맞아요", systemImage: saved ? "checkmark.circle.fill" : "checkmark.circle")
-                }
-                .buttonStyle(.bordered)
-                .disabled(saved)
             }
+            Text("▶︎ 30초 미리듣기 · ☆ 즐겨찾기")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
         .padding(20)
         .frame(maxWidth: .infinity)
@@ -415,12 +437,9 @@ struct CandidateRow: View {
                 SourceChips(sources: candidate.sources)
             }
             Spacer(minLength: 6)
-            Button(action: onSave) {
-                Text(saved ? "저장됨" : "이 곡이에요")
-                    .font(.caption.weight(.semibold))
-            }
-            .buttonStyle(.bordered)
-            .disabled(saved)
+            PreviewButton(title: candidate.title, artist: candidate.artist)
+            FavoriteButton(title: candidate.title, artist: candidate.artist,
+                           artworkURL: candidate.artworkURL, link: candidate.link)
         }
     }
 }
@@ -662,5 +681,25 @@ struct PhoneResultCard: View {
         }
         .padding(14)
         .glass(18)
+    }
+}
+
+// MARK: - 허밍으로 찾기
+
+struct HummingButton: View {
+    let active: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(active ? "허밍 듣는 중… (누르면 멈춤)" : "허밍으로 찾기", systemImage: active ? "stop.circle" : "music.mic")
+                .font(.headline)
+                .foregroundStyle(active ? Color.pink : Theme.ink)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .glass(30)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(active ? "허밍 멈추기" : "허밍으로 노래 찾기")
     }
 }
