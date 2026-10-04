@@ -140,7 +140,7 @@ struct StageView: View {
                 VStack(spacing: 6) {
                     Text("버튼을 누르고 노래를 들려주세요")
                         .font(.title3.weight(.semibold))
-                    Text("25초 동안 듣고, 여러 번 확인해서 가장 맞는 곡을 골라요.")
+                    Text("40초 동안 듣고, 여러 번 확인해서 가장 맞는 곡을 골라요.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -519,7 +519,7 @@ struct PhoneAudioButton: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("1. 유튜브·음악 앱에서 노래를 틀어 두세요.")
                     Text("2. 이 버튼을 누르고 \"방송 시작\"을 누르세요.")
-                    Text("3. 노래 앱으로 돌아가면 20초 뒤 알림으로 제목과 가수가 떠요.")
+                    Text("3. 노래 앱으로 돌아가면 40초 뒤 알림으로 제목과 가수가 떠요.")
                     Text("4. 화면 위 빨간 표시를 누르면 언제든 멈출 수 있어요.")
                     Text("이어폰을 끼고 있어도 돼요. 녹음을 막아 둔 앱(넷플릭스 등)의 소리는 들을 수 없어요.")
                         .foregroundStyle(.secondary)
