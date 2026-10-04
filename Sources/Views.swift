@@ -29,15 +29,36 @@ enum Theme {
 
 struct DreamyBackground: View {
     var body: some View {
-        ZStack {
-            LinearGradient(colors: [Color(red: 0.92, green: 0.95, blue: 1.0),
-                                    Color(red: 0.95, green: 0.93, blue: 1.0)],
-                           startPoint: .top, endPoint: .bottom)
-            Circle().fill(Theme.accentLight.opacity(0.35)).frame(width: 320).blur(radius: 60).offset(x: -120, y: -260)
-            Circle().fill(Theme.lavender.opacity(0.30)).frame(width: 300).blur(radius: 70).offset(x: 140, y: 120)
-            Circle().fill(Color.pink.opacity(0.12)).frame(width: 220).blur(radius: 60).offset(x: -100, y: 360)
+        ZStack(alignment: .bottom) {
+            Color.white
+            WaveShape(phase: 0, amp: 16)
+                .fill(Theme.accentLight.opacity(0.16))
+                .frame(height: 190)
+            WaveShape(phase: .pi, amp: 20)
+                .fill(Theme.accent.opacity(0.10))
+                .frame(height: 140)
         }
         .ignoresSafeArea()
+    }
+}
+
+struct WaveShape: Shape {
+    var phase: Double
+    var amp: Double
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: 0, y: rect.height))
+        let steps = 60
+        for i in 0...steps {
+            let t = Double(i) / Double(steps)
+            let x = rect.width * CGFloat(t)
+            let y = CGFloat(amp + sin(t * 2 * .pi + phase) * amp)
+            p.addLine(to: CGPoint(x: x, y: y))
+        }
+        p.addLine(to: CGPoint(x: rect.width, y: rect.height))
+        p.closeSubpath()
+        return p
     }
 }
 
@@ -153,34 +174,27 @@ struct ListenButton: View {
         Button(action: action) {
             ZStack {
                 Circle()
-                    .fill((busy ? Color.pink : Theme.accentLight).opacity(0.25))
-                    .frame(width: 230, height: 230)
-                    .blur(radius: 6)
-                    .scaleEffect(1 + CGFloat(level) * 0.3)
+                    .fill((busy ? Color.pink : Theme.accentLight).opacity(0.10))
+                    .frame(width: 290, height: 290)
+                    .scaleEffect(1 + CGFloat(level) * 0.15)
                     .animation(.easeOut(duration: 0.1), value: level)
                 Circle()
-                    .fill(.ultraThinMaterial)
-                    .frame(width: 196, height: 196)
-                    .overlay(Circle().stroke(.white.opacity(0.8), lineWidth: 1.5))
+                    .fill((busy ? Color.pink : Theme.accentLight).opacity(0.18))
+                    .frame(width: 240, height: 240)
                 Circle()
-                    .fill(busy ? LinearGradient(colors: [Color(red: 1, green: 0.62, blue: 0.72), Color(red: 0.95, green: 0.45, blue: 0.6)],
-                                                startPoint: .topLeading, endPoint: .bottomTrailing)
-                               : Theme.buttonGradient)
-                    .frame(width: 160, height: 160)
-                    .overlay(
-                        Circle()
-                            .fill(LinearGradient(colors: [.white.opacity(0.55), .clear], startPoint: .top, endPoint: .center))
-                            .padding(6)
-                    )
-                    .shadow(color: (busy ? Color.pink : Theme.accent).opacity(0.35), radius: 18, y: 10)
-                VStack(spacing: 6) {
-                    Image(systemName: busy ? "stop.fill" : "music.note")
-                        .font(.system(size: 50, weight: .semibold))
+                    .fill(busy ? LinearGradient(colors: [Color(red: 1, green: 0.66, blue: 0.75), Color(red: 0.94, green: 0.46, blue: 0.6)],
+                                                startPoint: .top, endPoint: .bottom)
+                               : LinearGradient(colors: [Color(red: 0.56, green: 0.73, blue: 1.0), Color(red: 0.40, green: 0.58, blue: 0.98)],
+                                                startPoint: .top, endPoint: .bottom))
+                    .frame(width: 196, height: 196)
+                    .shadow(color: (busy ? Color.pink : Theme.accent).opacity(0.30), radius: 20, y: 10)
+                VStack(spacing: 8) {
+                    Image(systemName: busy ? "stop.fill" : "waveform")
+                        .font(.system(size: 52, weight: .semibold))
                     Text(busy ? "멈추기" : "듣기")
-                        .font(.headline)
+                        .font(.title3.weight(.semibold))
                 }
                 .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
             }
         }
         .buttonStyle(.plain)
@@ -285,7 +299,8 @@ struct ResultsView: View {
         } else {
             VStack(spacing: 6) {
                 Text("곡을 찾지 못했어요")
-                    .font(.title3.weight(.semibold))
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(Theme.ink)
                 Text("노래 소리를 키우고, 후렴처럼 보컬이 잘 들리는 부분에서 다시 해 보세요.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
