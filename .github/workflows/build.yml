@@ -15,7 +15,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 앱 아이콘 만들기
-        run: python3 make_icon.py
+        run: |
+          mkdir -p Sources/Assets.xcassets/AppIcon.appiconset
+          if [ -f AppIcon.png ]; then
+            sips -s format png -z 1024 1024 AppIcon.png --out Sources/Assets.xcassets/AppIcon.appiconset/icon-1024.png
+          else
+            python3 make_icon.py
+          fi
 
       - name: XcodeGen 설치
         run: brew install xcodegen
@@ -32,6 +38,14 @@ jobs:
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             build > build.log 2>&1 || { grep -E "error:" build.log | head -50; tail -n 40 build.log; exit 1; }
           test -d build/Release-iphoneos/SongFinder.app
+
+      - name: 권한(App Group) 넣기
+        run: |
+          brew install ldid
+          APP=build/Release-iphoneos/SongFinder.app
+          ldid -SBroadcast.entitlements "$APP/PlugIns/SongFinderBroadcast.appex/SongFinderBroadcast"
+          ldid -SSongFinder.entitlements "$APP/SongFinder"
+          ldid -e "$APP/SongFinder"
 
       - name: 설치 파일(.ipa) 만들기
         run: |
