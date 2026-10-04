@@ -1,0 +1,44 @@
+name: 아이폰 앱 만들기
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: 코드 가져오기
+        uses: actions/checkout@v4
+
+      - name: 앱 아이콘 만들기
+        run: python3 make_icon.py
+
+      - name: XcodeGen 설치
+        run: brew install xcodegen
+
+      - name: Xcode 프로젝트 만들기
+        run: xcodegen generate
+
+      - name: 앱 빌드
+        run: |
+          xcodebuild -project SongFinder.xcodeproj \
+            -target SongFinder \
+            -configuration Release \
+            -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build > build.log 2>&1 || { grep -E "error:" build.log | head -50; tail -n 40 build.log; exit 1; }
+          test -d build/Release-iphoneos/SongFinder.app
+
+      - name: 설치 파일(.ipa) 만들기
+        run: |
+          mkdir -p Payload
+          cp -R build/Release-iphoneos/SongFinder.app Payload/
+          zip -qry SongFinder.ipa Payload
+
+      - name: 설치 파일 올리기
+        uses: actions/upload-artifact@v4
+        with:
+          name: SongFinder-ipa
+          path: SongFinder.ipa
