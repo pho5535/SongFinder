@@ -99,6 +99,7 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var showHistory = false
     @State private var lastPhone: SavedSong?
+    @State private var captureReady = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -120,6 +121,12 @@ struct ContentView: View {
                     .disabled(rec.isBusy && rec.mode != .humming)
                     if let song = lastPhone, rec.stage != .done {
                         PhoneResultCard(song: song) { lastPhone = nil }
+                    }
+                    if captureReady && !rec.isBusy {
+                        DeepCheckButton {
+                            lastPhone = nil
+                            task = Task { await rec.analyzePhoneCapture() }
+                        }
                     }
                     StageView(rec: rec)
                     if !rec.transcript.isEmpty {
@@ -171,6 +178,7 @@ struct ContentView: View {
         if let s = SharedStore.lastBroadcast(), Date().timeIntervalSince(s.date) < 600 {
             lastPhone = s
         }
+        captureReady = SharedStore.hasRecentCapture
     }
 
     private func toggle() {
@@ -678,6 +686,35 @@ struct PhoneResultCard: View {
         }
         .padding(14)
         .glass(18)
+    }
+}
+
+struct DeepCheckButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: "text.magnifyingglass")
+                    .font(.title3)
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 40, height: 40)
+                    .background(Theme.accent.opacity(0.12), in: Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("방금 폰 소리, 가사·커버로 다시 확인")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.ink)
+                    Text("커버곡·라이브도 가사와 멜로디로 원곡을 찾아요")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").font(.footnote).foregroundStyle(.tertiary)
+            }
+            .padding(14)
+            .glass(18)
+        }
+        .buttonStyle(.plain)
     }
 }
 
