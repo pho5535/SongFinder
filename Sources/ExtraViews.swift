@@ -167,8 +167,8 @@ struct TipsView: View {
     }
 
     private let tips: [Tip] = [
-        Tip(icon: "iphone.radiowaves.left.and.right", title: "이 폰에서 나는 노래는 \"이 폰 소리로 찾기\"",
-            body: "같은 폰에서 틀면서 마이크로 들으면 소리가 줄어들어요. 방송 기능으로 내부 소리를 직접 받으면 가장 정확해요."),
+        Tip(icon: "iphone.radiowaves.left.and.right", title: "이 폰에서 나는 노래 찾기",
+            body: "Melook에서 듣기를 누른 뒤 유튜브·멜론으로 가서 노래를 틀어 주세요. 뒤에서 계속 듣고 결과를 알림으로 보내요. 폰 소리는 중간 크기(50~70%)가 가장 정확해요."),
         Tip(icon: "music.mic", title: "보컬이 나오는 부분에서",
             body: "전주·간주보다 노래(특히 후렴)가 나올 때 시작하세요."),
         Tip(icon: "speaker.wave.3", title: "소리는 크게, 대화는 조용히",
