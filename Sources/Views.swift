@@ -108,8 +108,6 @@ struct ContentView: View {
                 VStack(spacing: 24) {
                     ListenButton(busy: rec.isBusy, level: rec.level) { toggle() }
                         .padding(.top, 16)
-                    PhoneAudioButton()
-                        .disabled(rec.isBusy)
                     HummingButton(active: rec.isBusy && rec.mode == .humming) {
                         if rec.isBusy {
                             task?.cancel()
@@ -119,15 +117,6 @@ struct ContentView: View {
                         }
                     }
                     .disabled(rec.isBusy && rec.mode != .humming)
-                    if let song = lastPhone, rec.stage != .done {
-                        PhoneResultCard(song: song) { lastPhone = nil }
-                    }
-                    if captureReady && !rec.isBusy {
-                        DeepCheckButton {
-                            lastPhone = nil
-                            task = Task { await rec.analyzePhoneCapture() }
-                        }
-                    }
                     StageView(rec: rec)
                     if !rec.transcript.isEmpty {
                         TranscriptBox(text: rec.transcript)
@@ -246,6 +235,14 @@ struct StageView: View {
                     Text("40초 동안 듣고, 여러 번 확인해서 가장 맞는 곡을 골라요.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                    Label("이 폰에서 나오는 노래도 돼요: 듣기를 누른 뒤 유튜브·멜론으로 가서 노래를 틀면, 뒤에서 계속 듣고 알림으로 알려줘요.",
+                          systemImage: "iphone.radiowaves.left.and.right")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.accent)
+                        .multilineTextAlignment(.leading)
+                        .padding(12)
+                        .glass(16)
+                        .padding(.top, 6)
                 }
             case .listening(let left):
                 VStack(spacing: 8) {
@@ -256,7 +253,7 @@ struct StageView: View {
                         .tint(.red)
                         .frame(maxWidth: 240)
                     Text(rec.mode == .humming ? "\"음~\" 소리로 멜로디를 또렷하게 흥얼거려 주세요."
-                                              : "대화나 잡음이 적은 곳에서, 노래 소리를 크게 들려주면 더 정확해요.")
+                                              : "지금 다른 앱으로 가서 노래를 틀어도 계속 들어요. 소리는 중간 크기(50~70%)가 가장 정확해요.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -539,7 +536,7 @@ struct SettingsView: View {
 
                 Section {
                     KeyField(title: "API 키", text: $auddToken)
-                    Text("\"이 폰 소리로 찾기\"에는 AudD 또는 ACRCloud 키가 꼭 필요해요.")
+                    Text("노래를 소리로 찾으려면 AudD 또는 ACRCloud 키가 꼭 필요해요. 둘 다 넣으면 더 정확해요.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     Link("dashboard.audd.io 에서 키 받기", destination: URL(string: "https://dashboard.audd.io/")!)
