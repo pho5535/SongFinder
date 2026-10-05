@@ -143,7 +143,7 @@ struct ContentView: View {
                 .padding(.bottom, 40)
             }
             .background(DreamyBackground())
-            .navigationTitle("Findy")
+            .navigationTitle("Melook")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showSettings = true } label: { Image(systemName: "key.fill") }
