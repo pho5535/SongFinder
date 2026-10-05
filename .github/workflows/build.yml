@@ -17,7 +17,10 @@ jobs:
       - name: 앱 아이콘 만들기
         run: |
           mkdir -p Sources/Assets.xcassets/AppIcon.appiconset
-          if [ -f AppIcon.png ]; then
+          if [ -f AppIcon.b64 ]; then
+            base64 -D -i AppIcon.b64 -o AppIcon.jpg
+            sips -s format png -z 1024 1024 AppIcon.jpg --out Sources/Assets.xcassets/AppIcon.appiconset/icon-1024.png
+          elif [ -f AppIcon.png ]; then
             sips -s format png -z 1024 1024 AppIcon.png --out Sources/Assets.xcassets/AppIcon.appiconset/icon-1024.png
           else
             python3 make_icon.py
