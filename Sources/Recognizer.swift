@@ -66,7 +66,7 @@ final class Recognizer: ObservableObject {
         }
         let perms = await AudioCapture.requestPermissions()
         guard perms.mic else {
-            stage = .failed("마이크 권한이 꺼져 있어요. 설정 앱 > 노래찾기에서 마이크를 켜 주세요.")
+            stage = .failed("마이크 권한이 꺼져 있어요. 설정 앱 > Melook에서 마이크를 켜 주세요.")
             return
         }
         let useSpeech = perms.speech && settings.hasGenius
