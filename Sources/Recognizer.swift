@@ -65,11 +65,6 @@ final class Recognizer: ObservableObject {
         notes = []
         warnings = []
         transcript = ""
-
-        guard settings.hasAnyEngine else {
-            stage = .failed("설정(열쇠 아이콘)에서 인식 서비스 키를 하나 이상 넣어 주세요.")
-            return
-        }
         let perms = await AudioCapture.requestPermissions()
         guard perms.mic else {
             stage = .failed("마이크 권한이 꺼져 있어요. 설정 앱 > Melook에서 마이크를 켜 주세요.")
@@ -120,6 +115,24 @@ final class Recognizer: ObservableObject {
             async let preciseText = preciseTranscript(snap: snap, settings: settings)
 
             var hits: [Hit] = []
+
+            // 샤잠(키 없이 무료)으로 먼저 찾아요
+            if mode == .song {
+                stage = .analyzing("샤잠으로 찾는 중…")
+                for st in starts.prefix(3) {
+                    do {
+                        if let h = try await ShazamEngine.recognize(samples: snap.samples, rate: snap.rate, from: st, length: 10) {
+                            hits.append(h)
+                            break
+                        }
+                    } catch {
+                        let msg = "Shazam: " + error.localizedDescription
+                        if !warnings.contains(msg) { warnings.append(msg) }
+                        break
+                    }
+                }
+            }
+
             stage = .analyzing("1차 인식 중… (\(engineNames(settings)))")
             hits += await identify(segments[0], lyrics: nil, settings: settings)
             var cands = Matcher.merge(hits)
@@ -147,6 +160,9 @@ final class Recognizer: ObservableObject {
                 }
             }
 
+            if cands.isEmpty && !settings.hasFingerprint {
+                warnings.append("더 정확하게 찾으려면 설정(열쇠)에서 AudD 키를 넣어 주세요.")
+            }
             candidates = Array(cands.prefix(5))
             confidence = Matcher.confidence(cands)
             notes = mode == .humming && !cands.isEmpty
@@ -287,7 +303,7 @@ final class Recognizer: ObservableObject {
     }
 
     private func engineNames(_ s: AppSettings) -> String {
-        var names: [String] = []
+        var names: [String] = ["Shazam"]
         if s.hasAudD { names.append("AudD") }
         if s.hasACR { names.append("ACRCloud") }
         if s.hasGenius { names.append("가사") }
