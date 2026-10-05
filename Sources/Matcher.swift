@@ -96,6 +96,7 @@ enum Matcher {
 
     private static func priority(_ s: Source) -> Int {
         switch s {
+        case .shazam: return 4
         case .audd: return 3
         case .acr: return 2
         case .lyrics: return 1
