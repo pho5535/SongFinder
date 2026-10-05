@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
 
+# 새로 올리면 이전 빌드는 취소하고 최신 것만 만들어요
+concurrency:
+  group: ios-build
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: macos-15
