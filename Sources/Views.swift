@@ -405,12 +405,13 @@ struct SongCard: View {
                 PreviewButton(title: candidate.title, artist: candidate.artist)
                 FavoriteButton(title: candidate.title, artist: candidate.artist,
                                artworkURL: candidate.artworkURL, link: candidate.link)
-                if let url = listenURL(title: candidate.title, artist: candidate.artist, link: nil) {
-                    Link(destination: url) {
-                        Label("전곡 듣기", systemImage: "play.rectangle.fill")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.accent)
+                ListenMenu(title: candidate.title, artist: candidate.artist) {
+                    Label("전곡 듣기", systemImage: "play.rectangle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .background(Theme.accent, in: Capsule())
                 }
             }
             Text("▶︎ 30초 미리듣기 · ☆ 즐겨찾기")
@@ -486,9 +487,7 @@ struct HistoryView: View {
                                     Text(song.artist).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                                 }
                                 Spacer()
-                                if let url = listenURL(title: song.title, artist: song.artist, link: song.link) {
-                                    Link(destination: url) { Image(systemName: "play.circle") }
-                                }
+                                ListenMenu(title: song.title, artist: song.artist) { Image(systemName: "play.circle") }
                             }
                         }
                         .onDelete { rec.deleteHistory(at: $0) }
@@ -672,9 +671,7 @@ struct PhoneResultCard: View {
                 Text(song.artist).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 6)
-            if let url = listenURL(title: song.title, artist: song.artist, link: song.link) {
-                Link(destination: url) { Image(systemName: "play.circle.fill").font(.title2) }
-            }
+            ListenMenu(title: song.title, artist: song.artist) { Image(systemName: "play.circle.fill").font(.title2) }
             Button(action: onClose) { Image(systemName: "xmark").font(.footnote) }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
