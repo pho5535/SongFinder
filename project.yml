@@ -14,7 +14,7 @@ targets:
     info:
       path: Info.plist
       properties:
-        CFBundleDisplayName: 노래찾기
+        CFBundleDisplayName: Melook
         CFBundleShortVersionString: "2.1"
         CFBundleVersion: "2"
         NSMicrophoneUsageDescription: 노래를 듣고 제목과 가수를 찾기 위해 마이크를 사용해요.
@@ -52,7 +52,7 @@ targets:
     info:
       path: BroadcastInfo.plist
       properties:
-        CFBundleDisplayName: 노래찾기
+        CFBundleDisplayName: Melook
         CFBundleShortVersionString: "2.1"
         CFBundleVersion: "2"
         NSExtension:
