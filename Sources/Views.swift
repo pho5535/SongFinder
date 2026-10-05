@@ -551,6 +551,7 @@ struct SettingsView: View {
     @AppStorage(Keys.acrSecret, store: SharedStore.defaults) private var acrSecret = ""
     @AppStorage(Keys.geniusToken, store: SharedStore.defaults) private var geniusToken = ""
     @AppStorage(Keys.openaiKey, store: SharedStore.defaults) private var openaiKey = ""
+    @AppStorage(Keys.geminiKey, store: SharedStore.defaults) private var geminiKey = ""
     @AppStorage(Keys.language, store: SharedStore.defaults) private var language = "ko-KR"
     @AppStorage(Keys.useLyrics, store: SharedStore.defaults) private var useLyrics = true
 
@@ -564,12 +565,21 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    KeyField(title: "AIza로 시작하는 키", text: $geminiKey)
+                    Link("aistudio.google.com/apikey 에서 무료 키 받기", destination: URL(string: "https://aistudio.google.com/apikey")!)
+                } header: {
+                    Text("Google Gemini · 커버곡도 찾기 (무료, 추천)")
+                } footer: {
+                    Text("AI가 노래를 직접 듣고 가사와 멜로디로 원곡을 맞혀요. 누가 불러도, 커버·라이브도 찾을 수 있어요. 구글 계정만 있으면 무료예요.")
+                }
+
+                Section {
                     KeyField(title: "sk-로 시작하는 키", text: $openaiKey)
                     Link("platform.openai.com/api-keys 에서 키 받기", destination: URL(string: "https://platform.openai.com/api-keys")!)
                 } header: {
-                    Text("OpenAI · 커버곡도 가사로 찾기 (추천)")
+                    Text("OpenAI · 가사 정밀 받아쓰기 (유료, 선택)")
                 } footer: {
-                    Text("노래 가사를 정밀하게 받아 적고, AI가 가사로 원곡을 맞혀요. 누가 불러도, 커버·라이브도 찾을 수 있어요. 검색 1번에 약 5~10원이 들어요.")
+                    Text("없어도 돼요. 넣으면 가사 받아쓰기가 더 정확해져요. 검색 1번에 약 5~10원이 들어요.")
                 }
 
                 Section {
