@@ -46,7 +46,6 @@ jobs:
         run: |
           brew install ldid
           APP=build/Release-iphoneos/SongFinder.app
-          ldid -SBroadcast.entitlements "$APP/PlugIns/SongFinderBroadcast.appex/SongFinderBroadcast"
           ldid -SSongFinder.entitlements "$APP/SongFinder"
           ldid -e "$APP/SongFinder"
 
