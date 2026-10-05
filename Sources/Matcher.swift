@@ -15,7 +15,7 @@ struct Candidate: Identifiable, Equatable {
     var displaySource: Source
 
     var fingerprintHits: Int { sources.filter { $0.key.isFingerprint }.map { $0.value }.reduce(0, +) }
-    var foundByLyricsOrCover: Bool { sources[.lyrics] != nil || sources[.acrCover] != nil }
+    var foundByLyricsOrCover: Bool { sources[.lyrics] != nil || sources[.acrCover] != nil || sources[.ai] != nil }
 
     static func == (a: Candidate, b: Candidate) -> Bool { a.id == b.id }
 }
@@ -99,6 +99,7 @@ enum Matcher {
         case .audd: return 3
         case .acr: return 2
         case .lyrics: return 1
+        case .ai: return 1
         case .acrCover: return 0
         }
     }
