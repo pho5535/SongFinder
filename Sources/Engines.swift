@@ -16,6 +16,7 @@ enum Source: String, Codable, Hashable, CaseIterable {
     case acr = "ACRCloud"
     case acrCover = "커버 인식"
     case lyrics = "가사"
+    case ai = "AI 가사"
 
     /// 녹음 파일과 소리가 똑같은지 비교하는 방식(지문 인식)인지
     var isFingerprint: Bool { self == .audd || self == .acr }
