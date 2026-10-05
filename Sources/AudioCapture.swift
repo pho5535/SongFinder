@@ -10,6 +10,7 @@ final class AudioCapture {
     private var speechRequest: SFSpeechAudioBufferRecognitionRequest?
     private var speechTask: SFSpeechRecognitionTask?
     private var tapInstalled = false
+    private var interruptionObserver: NSObjectProtocol?
     private(set) var sampleRate: Double = 44100
 
     /// 소리 크기(0~1), 오디오 스레드에서 호출돼요
@@ -115,11 +116,33 @@ final class AudioCapture {
         tapInstalled = true
         engine.prepare()
         try engine.start()
+
+        // 다른 앱(유튜브·멜론 등)이 소리를 틀면서 녹음이 잠깐 끊기면 다시 이어서 들어요
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let self = self,
+                  let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  AVAudioSession.InterruptionType(rawValue: raw) == .ended else { return }
+            try? AVAudioSession.sharedInstance().setActive(true)
+            if self.tapInstalled && !self.engine.isRunning { try? self.engine.start() }
+        }
+    }
+
+    /// 지금까지 녹음한 소리 전체
+    func snapshot() -> (samples: [Float], rate: Double) {
+        lock.lock()
+        defer { lock.unlock() }
+        return (samples, sampleRate)
     }
 
     /// 녹음을 멈추고, 지금까지 받아쓴 가사를 돌려줘요.
     @discardableResult
     func stop() -> String {
+        if let o = interruptionObserver {
+            NotificationCenter.default.removeObserver(o)
+            interruptionObserver = nil
+        }
         if engine.isRunning { engine.stop() }
         if tapInstalled {
             engine.inputNode.removeTap(onBus: 0)
