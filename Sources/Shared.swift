@@ -115,6 +115,41 @@ enum SharedStore {
         return try? JSONDecoder().decode(SavedSong.self, from: data)
     }
 
+    // MARK: - 방금 "이 폰 소리로 찾기"로 들은 소리 (앱에서 가사·커버로 다시 확인할 때 써요)
+
+    static var captureURL: URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupID)?
+            .appendingPathComponent("phoneCapture.wav")
+    }
+
+    static func saveCapture(_ all: [Float], rate: Double) {
+        guard let url = captureURL,
+              let wav = AudioClip.wav(all, rate: rate, from: 0, length: Double(all.count) / rate + 1) else { return }
+        try? wav.write(to: url, options: .atomic)
+    }
+
+    static var hasRecentCapture: Bool {
+        guard let url = captureURL,
+              let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let date = attrs[.modificationDate] as? Date else { return false }
+        return Date().timeIntervalSince(date) < 1800
+    }
+
+    static func loadCapture() -> (samples: [Float], rate: Double)? {
+        guard hasRecentCapture, let url = captureURL,
+              let data = try? Data(contentsOf: url), data.count > 44 + 16000 else { return nil }
+        let rate = data.withUnsafeBytes { Double(UInt32(littleEndian: $0.loadUnaligned(fromByteOffset: 24, as: UInt32.self))) }
+        let count = (data.count - 44) / 2
+        var out = [Float](repeating: 0, count: count)
+        data.withUnsafeBytes { raw in
+            for i in 0..<count {
+                let v = Int16(littleEndian: raw.loadUnaligned(fromByteOffset: 44 + i * 2, as: Int16.self))
+                out[i] = Float(v) / 32768
+            }
+        }
+        return (out, rate > 0 ? rate : 16000)
+    }
+
     /// 앱 안에 들어 있는 "방송(화면 기록) 확장"의 번들 ID
     static var broadcastExtensionID: String? {
         guard let dir = Bundle.main.builtInPlugInsURL,
@@ -150,5 +185,34 @@ enum AudioClip {
         for v in reduced { peak = max(peak, abs(v)) }
         let gain: Float = peak > 0.0001 ? min(0.9 / peak, 20) : 1
         return WAV.encode(reduced, sampleRate: Int(rate) / factor, gain: gain)
+    }
+
+    /// 소리가 꽉 차 있고 끊김이 적은(=노래가 나오는) 구간의 시작 시각들을 골라요
+    static func bestStarts(_ all: [Float], rate: Double, length: Double, count: Int) -> [Double] {
+        let win = max(1, Int(rate))            // 1초 단위
+        var rms: [Float] = []
+        var i = 0
+        while i + win <= all.count {
+            var sum: Float = 0
+            var j = i
+            while j < i + win { sum += all[j] * all[j]; j += 4 }
+            rms.append((sum / Float(max(1, win / 4))).squareRoot())
+            i += win
+        }
+        let len = Int(length)
+        guard rms.count > len else { return [0] }
+        var scored: [(start: Int, score: Float)] = []
+        for s in 0...(rms.count - len) {
+            let slice = rms[s..<(s + len)]
+            let mean = slice.reduce(0, +) / Float(len)
+            let gaps = slice.filter { $0 < mean * 0.3 }.count     // 뚝뚝 끊기는 구간(말소리·무음)은 감점
+            scored.append((s, mean * (1 - Float(gaps) / Float(len))))
+        }
+        scored.sort { $0.score > $1.score }
+        var picked: [Int] = []
+        for c in scored where picked.count < count {
+            if picked.allSatisfy({ abs($0 - c.start) >= len * 2 / 3 }) { picked.append(c.start) }
+        }
+        return picked.map { Double($0) }
     }
 }
