@@ -81,32 +81,34 @@ final class SampleHandler: RPBroadcastSampleHandler {
         let isBigEndian = flags & kAudioFormatFlagIsBigEndian != 0
         let nonInterleaved = flags & kAudioFormatFlagIsNonInterleaved != 0
         let bits = Int(asbd.mBitsPerChannel)
-        let step = nonInterleaved ? 1 : channels   // 첫 번째 채널만 사용해요
+        guard bits == 16 || bits == 32 else { return }
+        let bytes = bits / 8
+        let useChannels = min(channels, 2)          // 왼쪽·오른쪽을 합쳐서(모노) 더 또렷하게 받아요
 
         var out: [Float] = []
         out.reserveCapacity(frames)
         data.withUnsafeBytes { raw in
-            for i in 0..<frames {
-                let idx = i * step
+            func sample(_ idx: Int) -> Float? {
+                let off = idx * bytes
+                guard off + bytes <= raw.count else { return nil }
                 if bits == 16 {
-                    let off = idx * 2
-                    guard off + 2 <= raw.count else { break }
                     var u = raw.loadUnaligned(fromByteOffset: off, as: UInt16.self)
                     if isBigEndian { u = UInt16(bigEndian: u) }
-                    out.append(Float(Int16(bitPattern: u)) / 32768)
-                } else if bits == 32 {
-                    let off = idx * 4
-                    guard off + 4 <= raw.count else { break }
-                    var u = raw.loadUnaligned(fromByteOffset: off, as: UInt32.self)
-                    if isBigEndian { u = UInt32(bigEndian: u) }
-                    if isFloat {
-                        out.append(Float(bitPattern: u))
-                    } else {
-                        out.append(Float(Int32(bitPattern: u)) / 2147483648)
-                    }
-                } else {
-                    break
+                    return Float(Int16(bitPattern: u)) / 32768
                 }
+                var u = raw.loadUnaligned(fromByteOffset: off, as: UInt32.self)
+                if isBigEndian { u = UInt32(bigEndian: u) }
+                return isFloat ? Float(bitPattern: u) : Float(Int32(bitPattern: u)) / 2147483648
+            }
+            for i in 0..<frames {
+                var acc: Float = 0
+                var n = 0
+                for c in 0..<useChannels {
+                    let idx = nonInterleaved ? c * frames + i : i * channels + c
+                    if let v = sample(idx) { acc += v; n += 1 }
+                }
+                guard n > 0 else { break }
+                out.append(acc / Float(n))
             }
         }
 
@@ -141,23 +143,27 @@ final class SampleHandler: RPBroadcastSampleHandler {
             return
         }
 
-        let segments = [(15.0, 10.0), (2.0, 10.0), (28.0, 10.0)].compactMap {
-            AudioClip.wav(all, rate: rate, from: $0.0, length: $0.1)
-        }
+        // 앱에서 "가사·커버로 다시 확인"할 수 있게 들은 소리를 저장해 둬요
+        SharedStore.saveCapture(all, rate: rate)
+
+        // 노래가 또렷하게 나오는 12초 구간 3개를 골라서 차례로 확인해요
+        let starts = AudioClip.bestStarts(all, rate: rate, length: 12, count: 3)
+        let segments = starts.compactMap { AudioClip.wav(all, rate: rate, from: $0, length: 12) }
 
         var hits: [Hit] = []
         var errors: [String] = []
-        for (i, seg) in segments.enumerated() {
+        for seg in segments {
             let r = await identify(seg, settings: settings)
             hits += r.hits
             errors += r.errors
-            let c = Matcher.merge(hits)
-            if Matcher.confidence(c) == .sure || i >= 1 { break }   // 최대 2구간 (무료 사용량 절약)
+            if Matcher.confidence(Matcher.merge(hits)) == .sure { break }
         }
 
         let cands = Matcher.merge(hits)
+        let hint = "Melook 앱을 열고 '가사·커버로 다시 확인'을 누르면 커버곡도 찾아볼 수 있어요."
         guard let top = cands.first else {
-            finish(errors.first ?? "곡을 찾지 못했어요. 노래(보컬) 부분에서 다시 해 보세요.")
+            notify(title: "곡을 바로 찾지 못했어요", body: hint)
+            finish((errors.first.map { $0 + " " } ?? "") + hint)
             return
         }
 
@@ -166,8 +172,10 @@ final class SampleHandler: RPBroadcastSampleHandler {
         SharedStore.add(song)
         SharedStore.setLastBroadcast(song)
 
-        let label = Matcher.confidence(cands)?.label ?? ""
-        notify(title: "🎵 \(top.title)", body: "\(top.artist) · \(label)")
+        let conf = Matcher.confidence(cands)
+        let label = conf?.label ?? ""
+        let extra = conf == .sure ? "" : "\n" + hint
+        notify(title: "🎵 \(top.title)", body: "\(top.artist) · \(label)" + extra)
         finish("찾았어요: \(top.title) - \(top.artist)")
     }
 
