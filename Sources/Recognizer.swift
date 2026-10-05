@@ -59,6 +59,7 @@ final class Recognizer: ObservableObject {
             settings.auddToken = ""      // 허밍은 ACRCloud만 사용
             settings.geniusToken = ""
             settings.openaiKey = ""
+            settings.geminiKey = ""
         }
         candidates = []
         confidence = nil
@@ -113,6 +114,8 @@ final class Recognizer: ObservableObject {
 
             // OpenAI로 가사를 정밀하게 받아 적어요 (소리 인식과 동시에 진행)
             async let preciseText = preciseTranscript(snap: snap, settings: settings)
+            // Gemini(무료)가 노래를 직접 듣고 가사·원곡을 찾아요 (동시에 진행)
+            async let geminiResult = geminiAnalyze(snap: snap, settings: settings)
 
             var hits: [Hit] = []
 
@@ -149,9 +152,12 @@ final class Recognizer: ObservableObject {
 
             // 가사로 원곡 찾기 — 커버곡·누가 불러도 가사는 같아요
             if mode == .song {
-                stage = .analyzing("가사를 받아 적는 중…")
+                stage = .analyzing("AI가 노래를 듣고 원곡을 찾는 중…")
                 let better = await preciseText
-                if !better.isEmpty { lyrics = better }
+                let gem = await geminiResult
+                hits += gem.hits
+                cands = Matcher.merge(hits)
+                if !better.isEmpty { lyrics = better } else if !gem.lyrics.isEmpty { lyrics = gem.lyrics }
                 transcript = lyrics
                 if lyrics.split(whereSeparator: { $0.isWhitespace }).count >= 4 {
                     stage = .analyzing("가사로 원곡 찾는 중…")
@@ -272,6 +278,19 @@ final class Recognizer: ObservableObject {
         }
     }
 
+    private func geminiAnalyze(snap: (samples: [Float], rate: Double), settings: AppSettings) async -> GeminiEngine.Result {
+        guard settings.hasGemini,
+              let wav = AudioClip.wav(snap.samples, rate: snap.rate, from: 0, length: 60) else {
+            return GeminiEngine.Result(lyrics: "", hits: [])
+        }
+        do {
+            return try await GeminiEngine.analyze(wav: wav, key: settings.geminiKey)
+        } catch {
+            if !warnings.contains(error.localizedDescription) { warnings.append(error.localizedDescription) }
+            return GeminiEngine.Result(lyrics: "", hits: [])
+        }
+    }
+
     /// 받아 적은 가사로 여러 곳에서 동시에 원곡을 찾아요
     private func lyricHits(_ lyrics: String, settings: AppSettings) async -> [Hit] {
         await withTaskGroup(of: (hits: [Hit], warning: String?).self) { group in
@@ -307,6 +326,7 @@ final class Recognizer: ObservableObject {
         if s.hasAudD { names.append("AudD") }
         if s.hasACR { names.append("ACRCloud") }
         if s.hasGenius { names.append("가사") }
+        if s.hasGemini { names.append("Gemini") }
         if s.hasOpenAI { names.append("AI") }
         return names.joined(separator: " · ")
     }
