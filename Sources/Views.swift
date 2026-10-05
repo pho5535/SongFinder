@@ -522,6 +522,7 @@ struct SettingsView: View {
     @AppStorage(Keys.acrAccess, store: SharedStore.defaults) private var acrAccess = ""
     @AppStorage(Keys.acrSecret, store: SharedStore.defaults) private var acrSecret = ""
     @AppStorage(Keys.geniusToken, store: SharedStore.defaults) private var geniusToken = ""
+    @AppStorage(Keys.openaiKey, store: SharedStore.defaults) private var openaiKey = ""
     @AppStorage(Keys.language, store: SharedStore.defaults) private var language = "ko-KR"
     @AppStorage(Keys.useLyrics, store: SharedStore.defaults) private var useLyrics = true
 
@@ -532,6 +533,15 @@ struct SettingsView: View {
                     Text("서비스를 많이 켤수록 더 정확해요. 하나만 넣어도 쓸 수 있어요. 키는 이 아이폰에만 저장돼요.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    KeyField(title: "sk-로 시작하는 키", text: $openaiKey)
+                    Link("platform.openai.com/api-keys 에서 키 받기", destination: URL(string: "https://platform.openai.com/api-keys")!)
+                } header: {
+                    Text("OpenAI · 커버곡도 가사로 찾기 (추천)")
+                } footer: {
+                    Text("노래 가사를 정밀하게 받아 적고, AI가 가사로 원곡을 맞혀요. 누가 불러도, 커버·라이브도 찾을 수 있어요. 검색 1번에 약 5~10원이 들어요.")
                 }
 
                 Section {
