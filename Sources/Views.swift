@@ -13,32 +13,65 @@ struct SongFinderApp: App {
     }
 }
 
-// MARK: - 디자인 (아이콘과 같은 파스텔 유리 느낌)
+// MARK: - 디자인 (새 아이콘과 같은 오션 블루: 네이비 → 로열 블루 → 시안)
 
 enum Theme {
-    static let accent = Color(red: 0.36, green: 0.55, blue: 0.96)
-    static let accentLight = Color(red: 0.56, green: 0.77, blue: 1.0)
-    static let lavender = Color(red: 0.70, green: 0.66, blue: 0.98)
-    static let ink = Color(red: 0.16, green: 0.20, blue: 0.36)
-    static let mint = Color(red: 0.36, green: 0.78, blue: 0.86)
+    static let accent = Color(red: 0.09, green: 0.42, blue: 0.95)       // 로열 블루
+    static let accentLight = Color(red: 0.16, green: 0.78, blue: 0.98)  // 시안
+    static let lavender = Color(red: 0.04, green: 0.19, blue: 0.60)     // 네이비
+    static let ink = Color(red: 0.05, green: 0.12, blue: 0.32)
+    static let mint = Color(red: 0.16, green: 0.78, blue: 0.98)
 
     static var buttonGradient: LinearGradient {
-        LinearGradient(colors: [accentLight, accent, lavender], startPoint: .topLeading, endPoint: .bottomTrailing)
+        LinearGradient(colors: [accentLight, accent, lavender], startPoint: .topTrailing, endPoint: .bottomLeading)
     }
 }
 
 struct DreamyBackground: View {
     var body: some View {
         ZStack(alignment: .bottom) {
-            Color.white
-            WaveShape(phase: 0, amp: 16)
-                .fill(Theme.accentLight.opacity(0.16))
-                .frame(height: 190)
-            WaveShape(phase: .pi, amp: 20)
-                .fill(Theme.accent.opacity(0.10))
+            LinearGradient(colors: [Color(red: 0.93, green: 0.97, blue: 1.0), .white],
+                           startPoint: .top, endPoint: .center)
+            WaveShape(phase: 0, amp: 18)
+                .fill(LinearGradient(colors: [Theme.accentLight.opacity(0.22), Theme.accent.opacity(0.10)],
+                                     startPoint: .leading, endPoint: .trailing))
+                .frame(height: 200)
+            WaveShape(phase: .pi, amp: 22)
+                .fill(LinearGradient(colors: [Theme.accent.opacity(0.14), Theme.lavender.opacity(0.12)],
+                                     startPoint: .leading, endPoint: .trailing))
                 .frame(height: 140)
         }
         .ignoresSafeArea()
+    }
+}
+
+/// 아이콘처럼 버튼 양옆에 퍼지는 소리 물결
+struct SoundArcs: View {
+    var active: Bool
+    var level: Float
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<2, id: \.self) { i in
+                let size: CGFloat = i == 0 ? 248 : 300
+                let width: CGFloat = i == 0 ? 12 : 14
+                let colors: [Color] = i == 0 ? [Theme.accent, Theme.accentLight] : [Theme.lavender, Theme.accent]
+                Circle()
+                    .trim(from: 0.40, to: 0.60)
+                    .stroke(LinearGradient(colors: colors, startPoint: .top, endPoint: .bottom),
+                            style: StrokeStyle(lineWidth: width, lineCap: .round))
+                    .frame(width: size, height: size)
+                Circle()
+                    .trim(from: 0.40, to: 0.60)
+                    .stroke(LinearGradient(colors: colors.reversed(), startPoint: .top, endPoint: .bottom),
+                            style: StrokeStyle(lineWidth: width, lineCap: .round))
+                    .frame(width: size, height: size)
+                    .rotationEffect(.degrees(180))
+            }
+        }
+        .scaleEffect(active ? 1 + CGFloat(level) * 0.12 : 1)
+        .opacity(active ? 1 : 0.85)
+        .animation(.easeOut(duration: 0.12), value: level)
     }
 }
 
@@ -190,21 +223,16 @@ struct ListenButton: View {
     var body: some View {
         Button(action: action) {
             ZStack {
+                SoundArcs(active: busy, level: level)
                 Circle()
-                    .fill((busy ? Color.pink : Theme.accentLight).opacity(0.10))
-                    .frame(width: 290, height: 290)
-                    .scaleEffect(1 + CGFloat(level) * 0.15)
-                    .animation(.easeOut(duration: 0.1), value: level)
+                    .fill(Theme.accentLight.opacity(busy ? 0.16 : 0.10))
+                    .frame(width: 214, height: 214)
                 Circle()
-                    .fill((busy ? Color.pink : Theme.accentLight).opacity(0.18))
-                    .frame(width: 240, height: 240)
-                Circle()
-                    .fill(busy ? LinearGradient(colors: [Color(red: 1, green: 0.66, blue: 0.75), Color(red: 0.94, green: 0.46, blue: 0.6)],
+                    .fill(busy ? LinearGradient(colors: [Theme.accent, Theme.lavender],
                                                 startPoint: .top, endPoint: .bottom)
-                               : LinearGradient(colors: [Color(red: 0.56, green: 0.73, blue: 1.0), Color(red: 0.40, green: 0.58, blue: 0.98)],
-                                                startPoint: .top, endPoint: .bottom))
-                    .frame(width: 196, height: 196)
-                    .shadow(color: (busy ? Color.pink : Theme.accent).opacity(0.30), radius: 20, y: 10)
+                               : Theme.buttonGradient)
+                    .frame(width: 190, height: 190)
+                    .shadow(color: Theme.accent.opacity(0.35), radius: 22, y: 12)
                 VStack(spacing: 8) {
                     Image(systemName: busy ? "stop.fill" : "waveform")
                         .font(.system(size: 52, weight: .semibold))
@@ -735,7 +763,7 @@ struct HummingButton: View {
         Button(action: action) {
             Label(active ? "허밍 듣는 중… (누르면 멈춤)" : "허밍으로 찾기", systemImage: active ? "stop.circle" : "music.mic")
                 .font(.headline)
-                .foregroundStyle(active ? Color.pink : Theme.ink)
+                .foregroundStyle(active ? Theme.accent : Theme.ink)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .glass(30)
