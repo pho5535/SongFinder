@@ -27,6 +27,38 @@ final class AudioCapture {
         return (mic, speech)
     }
 
+    static func requestSpeechPermission() async -> Bool {
+        await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+            SFSpeechRecognizer.requestAuthorization { status in
+                cont.resume(returning: status == .authorized)
+            }
+        }
+    }
+
+    /// 저장된 소리 파일에서 가사를 받아 적어요 (최대 30초 기다려요)
+    static func transcribeFile(_ url: URL, language: String) async -> String {
+        guard SFSpeechRecognizer.authorizationStatus() == .authorized,
+              let recognizer = SFSpeechRecognizer(locale: Locale(identifier: language)),
+              recognizer.isAvailable else { return "" }
+        let request = SFSpeechURLRecognitionRequest(url: url)
+        request.shouldReportPartialResults = false
+        request.taskHint = .dictation
+        let once = OnceBox()
+        return await withCheckedContinuation { (cont: CheckedContinuation<String, Never>) in
+            let task = recognizer.recognitionTask(with: request) { result, error in
+                if let result = result, result.isFinal {
+                    once.run { cont.resume(returning: result.bestTranscription.formattedString) }
+                } else if error != nil {
+                    once.run { cont.resume(returning: result?.bestTranscription.formattedString ?? "") }
+                }
+            }
+            DispatchQueue.global().asyncAfter(deadline: .now() + 30) {
+                task.cancel()
+                once.run { cont.resume(returning: "") }
+            }
+        }
+    }
+
     func start(language: String, useSpeech: Bool) throws {
         let session = AVAudioSession.sharedInstance()
         // measurement 모드: 음성용 잡음 제거를 끄고 음악 소리를 최대한 그대로 받아요
@@ -137,6 +169,19 @@ final class AudioCapture {
         for v in reduced { peak = max(peak, abs(v)) }
         let gain: Float = peak > 0.0001 ? min(0.9 / peak, 20) : 1
         return WAV.encode(reduced, sampleRate: outRate, gain: gain)
+    }
+}
+
+/// 한 번만 실행되게 막아 주는 작은 도우미
+final class OnceBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var done = false
+    func run(_ block: () -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !done else { return }
+        done = true
+        block()
     }
 }
 
