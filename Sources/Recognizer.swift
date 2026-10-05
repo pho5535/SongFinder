@@ -144,6 +144,63 @@ final class Recognizer: ObservableObject {
         }
     }
 
+    /// "이 폰 소리로 찾기"로 방금 들은 소리를 가사·커버까지 써서 다시 확인해요
+    func analyzePhoneCapture() async {
+        guard !isBusy else { return }
+        mode = .song
+        let settings = AppSettings.load()
+        candidates = []
+        confidence = nil
+        notes = []
+        warnings = []
+        transcript = ""
+        guard settings.hasAnyEngine else {
+            stage = .failed("설정(열쇠 아이콘)에서 인식 서비스 키를 하나 이상 넣어 주세요.")
+            return
+        }
+        guard let cap = SharedStore.loadCapture(), let url = SharedStore.captureURL else {
+            stage = .failed("최근 30분 안에 '이 폰 소리로 찾기'로 들은 소리가 없어요. 먼저 이 폰 소리로 찾기를 해 주세요.")
+            return
+        }
+
+        var lyrics = ""
+        if settings.hasGenius {
+            stage = .analyzing("폰 소리에서 가사를 받아 적는 중…")
+            if await AudioCapture.requestSpeechPermission() {
+                lyrics = await AudioCapture.transcribeFile(url, language: settings.language)
+            } else {
+                warnings.append("음성 인식 권한이 꺼져 있어서 가사 확인은 건너뛰어요.")
+            }
+        } else {
+            warnings.append("Genius 키를 넣으면 커버곡도 가사로 원곡을 찾을 수 있어요.")
+        }
+        transcript = lyrics
+
+        let starts = AudioClip.bestStarts(cap.samples, rate: cap.rate, length: 12, count: 3)
+        let segments = starts.compactMap { AudioClip.wav(cap.samples, rate: cap.rate, from: $0, length: 12) }
+        guard !segments.isEmpty else {
+            stage = .failed("저장된 소리가 너무 짧아요. 이 폰 소리로 찾기를 다시 해 주세요.")
+            return
+        }
+
+        var hits: [Hit] = []
+        for (n, seg) in segments.enumerated() {
+            if Task.isCancelled { stage = .idle; return }
+            stage = .analyzing("원곡·커버 확인 중… (\(n + 1)/\(segments.count)구간)")
+            hits += await identify(seg, lyrics: n == 0 ? lyrics : nil, settings: settings)
+        }
+
+        let cands = Matcher.merge(hits)
+        candidates = Array(cands.prefix(5))
+        confidence = Matcher.confidence(cands)
+        notes = Matcher.notes(for: cands)
+        if let top = cands.first {
+            Library.shared.addRecent(title: top.title, artist: top.artist, artworkURL: top.artworkURL, link: top.link)
+            history = SharedStore.loadHistory()
+        }
+        stage = .done
+    }
+
     func cancel() {
         capture.stop()
         level = 0
