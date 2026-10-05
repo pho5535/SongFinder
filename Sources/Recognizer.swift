@@ -58,6 +58,7 @@ final class Recognizer: ObservableObject {
             }
             settings.auddToken = ""      // 허밍은 ACRCloud만 사용
             settings.geniusToken = ""
+            settings.openaiKey = ""
         }
         candidates = []
         confidence = nil
@@ -74,8 +75,8 @@ final class Recognizer: ObservableObject {
             stage = .failed("마이크 권한이 꺼져 있어요. 설정 앱 > Melook에서 마이크를 켜 주세요.")
             return
         }
-        let useSpeech = perms.speech && settings.hasGenius
-        if settings.hasGenius && !perms.speech {
+        let useSpeech = perms.speech && (settings.hasGenius || settings.hasAudD || settings.hasOpenAI) && mode == .song
+        if settings.hasGenius && !perms.speech && !settings.hasOpenAI {
             warnings.append("음성 인식 권한이 꺼져 있어서 가사 확인은 건너뛰어요.")
         }
 
@@ -98,7 +99,7 @@ final class Recognizer: ObservableObject {
             level = 0
             stage = .analyzing("들은 소리를 정리하는 중…")
             try await Task.sleep(nanoseconds: 700_000_000)   // 마지막 받아쓰기 결과 기다리기
-            let lyrics = transcript.count >= text.count ? transcript : text
+            var lyrics = transcript.count >= text.count ? transcript : text
             transcript = lyrics
 
             // 들은 소리 중 구간을 골라요. 가운데 구간부터 먼저 보내요.
@@ -115,9 +116,12 @@ final class Recognizer: ObservableObject {
                 return
             }
 
+            // OpenAI로 가사를 정밀하게 받아 적어요 (소리 인식과 동시에 진행)
+            async let preciseText = preciseTranscript(snap: snap, settings: settings)
+
             var hits: [Hit] = []
             stage = .analyzing("1차 인식 중… (\(engineNames(settings)))")
-            hits += await identify(segments[0], lyrics: lyrics, settings: settings)
+            hits += await identify(segments[0], lyrics: nil, settings: settings)
             var cands = Matcher.merge(hits)
 
             // 확실하지 않으면 나머지 구간도 보내서 투표해요
@@ -128,6 +132,19 @@ final class Recognizer: ObservableObject {
                     hits += await identify(seg, lyrics: nil, settings: settings)
                 }
                 cands = Matcher.merge(hits)
+            }
+
+            // 가사로 원곡 찾기 — 커버곡·누가 불러도 가사는 같아요
+            if mode == .song {
+                stage = .analyzing("가사를 받아 적는 중…")
+                let better = await preciseText
+                if !better.isEmpty { lyrics = better }
+                transcript = lyrics
+                if lyrics.split(whereSeparator: { $0.isWhitespace }).count >= 4 {
+                    stage = .analyzing("가사로 원곡 찾는 중…")
+                    hits += await lyricHits(lyrics, settings: settings)
+                    cands = Matcher.merge(hits)
+                }
             }
 
             candidates = Array(cands.prefix(5))
@@ -228,11 +245,53 @@ final class Recognizer: ObservableObject {
         stage = .idle
     }
 
+    private func preciseTranscript(snap: (samples: [Float], rate: Double), settings: AppSettings) async -> String {
+        guard settings.hasOpenAI,
+              let wav = AudioClip.wav(snap.samples, rate: snap.rate, from: 0, length: 60) else { return "" }
+        do {
+            return try await OpenAIEngine.transcribe(wav: wav, key: settings.openaiKey, language: settings.language)
+        } catch {
+            if !warnings.contains(error.localizedDescription) { warnings.append(error.localizedDescription) }
+            return ""
+        }
+    }
+
+    /// 받아 적은 가사로 여러 곳에서 동시에 원곡을 찾아요
+    private func lyricHits(_ lyrics: String, settings: AppSettings) async -> [Hit] {
+        await withTaskGroup(of: (hits: [Hit], warning: String?).self) { group in
+            if settings.hasGenius {
+                group.addTask {
+                    do { return (try await Genius.search(transcript: lyrics, token: settings.geniusToken), nil) }
+                    catch { return ([], error.localizedDescription) }
+                }
+            }
+            if settings.hasAudD {
+                group.addTask {
+                    do { return (try await AudDLyrics.search(lyrics, token: settings.auddToken), nil) }
+                    catch { return ([], error.localizedDescription) }
+                }
+            }
+            if settings.hasOpenAI {
+                group.addTask {
+                    do { return (try await OpenAIEngine.identify(lyrics: lyrics, key: settings.openaiKey), nil) }
+                    catch { return ([], error.localizedDescription) }
+                }
+            }
+            var all: [Hit] = []
+            for await r in group {
+                all += r.hits
+                if let w = r.warning, !self.warnings.contains(w) { self.warnings.append(w) }
+            }
+            return all
+        }
+    }
+
     private func engineNames(_ s: AppSettings) -> String {
         var names: [String] = []
         if s.hasAudD { names.append("AudD") }
         if s.hasACR { names.append("ACRCloud") }
         if s.hasGenius { names.append("가사") }
+        if s.hasOpenAI { names.append("AI") }
         return names.joined(separator: " · ")
     }
 
