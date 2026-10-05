@@ -16,7 +16,7 @@ final class SampleHandler: RPBroadcastSampleHandler {
         samples.reserveCapacity(48000 * 42)
         done = false
         lock.unlock()
-        notify(title: "노래찾기", body: "이 폰에서 나오는 소리를 듣고 있어요… (약 40초)")
+        notify(title: "Melook", body: "이 폰에서 나오는 소리를 듣고 있어요… (약 40초)")
         DispatchQueue.global().asyncAfter(deadline: .now() + 70) { [weak self] in
             self?.timeoutCheck()
         }
@@ -129,7 +129,7 @@ final class SampleHandler: RPBroadcastSampleHandler {
             if !SharedStore.isShared {
                 finish("앱 설정을 읽지 못했어요. 앱을 한 번 열어 키를 다시 저장한 뒤 시도해 주세요.")
             } else {
-                finish("노래찾기 앱 설정(열쇠)에서 AudD 키를 넣어 주세요. 이 폰 소리로 찾기는 AudD 또는 ACRCloud 키가 필요해요.")
+                finish("Melook 앱 설정(열쇠)에서 AudD 키를 넣어 주세요. 이 폰 소리로 찾기는 AudD 또는 ACRCloud 키가 필요해요.")
             }
             return
         }
