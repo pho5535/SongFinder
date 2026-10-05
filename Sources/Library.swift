@@ -266,12 +266,10 @@ struct SongRow: View {
             Spacer(minLength: 4)
             PreviewButton(title: title, artist: artist)
             FavoriteButton(title: title, artist: artist, artworkURL: artworkURL, link: link)
-            if let url = listenURL(title: title, artist: artist, link: nil) {
-                Link(destination: url) {
-                    Image(systemName: "arrow.up.right.circle").font(.title3).foregroundStyle(Theme.accent)
-                }
-                .accessibilityLabel("전곡 듣기")
+            ListenMenu(title: title, artist: artist) {
+                Image(systemName: "arrow.up.right.circle").font(.title3).foregroundStyle(Theme.accent)
             }
+            .accessibilityLabel("전곡 듣기")
         }
         .padding(.vertical, 4)
     }
