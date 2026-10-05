@@ -12,6 +12,7 @@ enum SongFinderError: LocalizedError {
 
 /// 결과를 낸 곳
 enum Source: String, Codable, Hashable, CaseIterable {
+    case shazam = "Shazam"
     case audd = "AudD"
     case acr = "ACRCloud"
     case acrCover = "커버 인식"
@@ -19,7 +20,7 @@ enum Source: String, Codable, Hashable, CaseIterable {
     case ai = "AI 가사"
 
     /// 녹음 파일과 소리가 똑같은지 비교하는 방식(지문 인식)인지
-    var isFingerprint: Bool { self == .audd || self == .acr }
+    var isFingerprint: Bool { self == .audd || self == .acr || self == .shazam }
 }
 
 /// 인식 서비스 한 곳이 돌려준 결과 하나
