@@ -8,6 +8,7 @@ enum Keys {
     static let acrSecret = "acrSecret"
     static let geniusToken = "geniusToken"
     static let openaiKey = "openaiKey"
+    static let geminiKey = "geminiKey"
     static let language = "speechLanguage"
     static let useLyrics = "useLyrics"
     static let history = "songHistory2"
@@ -31,6 +32,7 @@ struct AppSettings {
     var acrSecret: String
     var geniusToken: String
     var openaiKey: String
+    var geminiKey: String
     var language: String
     var useLyrics: Bool
 
@@ -41,6 +43,7 @@ struct AppSettings {
                            acrAccess: s(Keys.acrAccess), acrSecret: s(Keys.acrSecret),
                            geniusToken: s(Keys.geniusToken),
                            openaiKey: s(Keys.openaiKey),
+                           geminiKey: s(Keys.geminiKey),
                            language: d.string(forKey: Keys.language) ?? "ko-KR",
                            useLyrics: d.object(forKey: Keys.useLyrics) as? Bool ?? true)
     }
@@ -49,7 +52,8 @@ struct AppSettings {
     var hasACR: Bool { !acrHost.isEmpty && !acrAccess.isEmpty && !acrSecret.isEmpty }
     var hasGenius: Bool { !geniusToken.isEmpty && useLyrics }
     var hasOpenAI: Bool { !openaiKey.isEmpty }
-    var hasAnyEngine: Bool { hasAudD || hasACR || hasGenius || hasOpenAI }
+    var hasGemini: Bool { !geminiKey.isEmpty }
+    var hasAnyEngine: Bool { hasAudD || hasACR || hasGenius || hasOpenAI || hasGemini }
     var hasFingerprint: Bool { hasAudD || hasACR }
 }
 
