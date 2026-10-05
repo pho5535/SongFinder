@@ -1,5 +1,7 @@
 import Foundation
 import SwiftUI
+import UIKit
+import UserNotifications
 
 @MainActor
 final class Recognizer: ObservableObject {
@@ -43,6 +45,9 @@ final class Recognizer: ObservableObject {
 
     func run(mode: Mode = .song) async {
         guard !isBusy else { return }
+        // 다른 앱으로 넘어가도 끝까지 듣고 찾을 수 있게 해요
+        let bgTask = UIApplication.shared.beginBackgroundTask(withName: "melook-recognize") {}
+        defer { UIApplication.shared.endBackgroundTask(bgTask) }
         self.mode = mode
         seconds = mode == .humming ? 15 : 40
         var settings = AppSettings.load()
@@ -97,11 +102,13 @@ final class Recognizer: ObservableObject {
             transcript = lyrics
 
             // 들은 소리 중 구간을 골라요. 가운데 구간부터 먼저 보내요.
-            let ranges: [(Double, Double)] = mode == .humming
-                ? [(2.0, 12.0)]
-                : [(16.0, 10.0), (3.0, 10.0), (29.0, 10.0)]
-            let segments = ranges.compactMap {
-                capture.wavSegment(from: $0.0, length: $0.1)
+            // 노래가 가장 또렷하게 들린 12초 구간 3개를 골라요 (조용한 부분·말소리 부분은 피해요)
+            let snap = capture.snapshot()
+            let starts: [Double] = mode == .humming
+                ? [2.0]
+                : AudioClip.bestStarts(snap.samples, rate: snap.rate, length: 12, count: 3)
+            let segments = starts.compactMap {
+                AudioClip.wav(snap.samples, rate: snap.rate, from: $0, length: 12)
             }
             guard !segments.isEmpty else {
                 stage = .failed("소리가 충분히 녹음되지 않았어요. 다시 시도해 주세요.")
@@ -131,6 +138,9 @@ final class Recognizer: ObservableObject {
             if let top = cands.first {
                 Library.shared.addRecent(title: top.title, artist: top.artist, artworkURL: top.artworkURL, link: top.link)
                 history = SharedStore.loadHistory()
+                notifyIfBackground("🎵 \(top.title)", "\(top.artist) · \(confidence?.label ?? "")")
+            } else {
+                notifyIfBackground("곡을 찾지 못했어요", warnings.first ?? "노래(보컬)가 나오는 부분에서 다시 해 보세요.")
             }
             stage = .done
         } catch is CancellationError {
@@ -199,6 +209,17 @@ final class Recognizer: ObservableObject {
             history = SharedStore.loadHistory()
         }
         stage = .done
+    }
+
+    /// 다른 앱에 가 있을 때 결과를 알림으로 알려줘요
+    private func notifyIfBackground(_ title: String, _ body: String) {
+        guard UIApplication.shared.applicationState != .active else { return }
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
     }
 
     func cancel() {
